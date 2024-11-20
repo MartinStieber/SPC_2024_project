@@ -55,6 +55,12 @@ build CMakeFiles/SPC_2024_project.dir/main.c.o: C_COMPILER__SPC_2024_project_uns
   OBJECT_DIR = CMakeFiles/SPC_2024_project.dir
   OBJECT_FILE_DIR = CMakeFiles/SPC_2024_project.dir
 
+build CMakeFiles/SPC_2024_project.dir/TQueue.c.o: C_COMPILER__SPC_2024_project_unscanned_Debug /home/martin/CLionProjects/SPC_2024_project/TQueue.c || cmake_object_order_depends_target_SPC_2024_project
+  DEP_FILE = CMakeFiles/SPC_2024_project.dir/TQueue.c.o.d
+  FLAGS = -fsanitize=address -g -g -std=gnu2x -fdiagnostics-color=always
+  OBJECT_DIR = CMakeFiles/SPC_2024_project.dir
+  OBJECT_FILE_DIR = CMakeFiles/SPC_2024_project.dir
+
 
 # =============================================================================
 # Link build statements for EXECUTABLE target SPC_2024_project
@@ -63,7 +69,7 @@ build CMakeFiles/SPC_2024_project.dir/main.c.o: C_COMPILER__SPC_2024_project_uns
 #############################################
 # Link the executable SPC_2024_project
 
-build SPC_2024_project: C_EXECUTABLE_LINKER__SPC_2024_project_Debug CMakeFiles/SPC_2024_project.dir/main.c.o
+build SPC_2024_project: C_EXECUTABLE_LINKER__SPC_2024_project_Debug CMakeFiles/SPC_2024_project.dir/main.c.o CMakeFiles/SPC_2024_project.dir/TQueue.c.o
   FLAGS = -fsanitize=address -g -g
   OBJECT_DIR = CMakeFiles/SPC_2024_project.dir
   POST_BUILD = :

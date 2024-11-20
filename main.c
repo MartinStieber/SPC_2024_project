@@ -6,12 +6,15 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include "TQueue.h"
 
 #define PORT "/dev/ttyACM0"
 
 int port = -1; // Globální proměnná pro port
 char* buffer = nullptr; // Globální ukazatel pro buffer
 char* command = nullptr; // Globální ukazatel pro string příkazu
+
+struct TQueue buffer_queue;
 
 int UART_Init(const int port)
 {
@@ -73,6 +76,7 @@ void signal_exit_handler(const int signum)
         command = nullptr;
         printf("RELEASED\n");
     }
+    queue_destroy(&buffer_queue);
     printf("Sanity checked\n");
     printf("Exiting...\n");
     exit(signum);
@@ -119,6 +123,15 @@ char str_num_checker(char* num)
     return 0;
 }
 
+unsigned int count_digits(const unsigned int num)
+{
+    if (num / 10 == 0)
+    {
+        return 1;
+    }
+    return 1 + count_digits(num / 10);
+}
+
 int main()
 {
     // Nastavení handlerů signálů
@@ -147,7 +160,7 @@ int main()
         return 1;
     }
 
-    //Welcome
+    //Handshake
     constexpr char welcome = 'w';
     sleep(2);
     printf("Sending welcome byte now...");
@@ -166,7 +179,10 @@ int main()
     while (rec_byte != welcome);
     printf("Connection established, welcome byte OK\n");
 
+    struct TQueue buffer_queue;
+    queue_init(&buffer_queue);
 
+    unsigned int full_num_count = 0;
     //Main loop
     do
     {
@@ -186,6 +202,8 @@ int main()
                 break;
             }
 
+            usleep(5000);
+
             const int num_bytes = (int)read(port, buffer, bytes_available);
             if (num_bytes < 0)
             {
@@ -197,15 +215,60 @@ int main()
             for (int i = 0; i < num_bytes; i++)
             {
                 printf("%c", buffer[i]);
+                queue_push(&buffer_queue, buffer[i]);
+                if (buffer[i] == '\n')
+                    full_num_count++;
             }
+            free(buffer);
+            buffer = nullptr;
             printf("\n");
+        }
+
+    NUM_RUNAW_HANDL:
+
+        if (full_num_count != 0)
+        {
+            char* new_val = malloc(5 * sizeof(char));
+            for (int i = 0; i < 5; ++i)
+            {
+                new_val[i] = '\n';
+            }
+
+            unsigned char iter = 0;
+            char number_complete = 0;
+
+            do
+            {
+                queue_front(&buffer_queue, &new_val[iter]);
+                queue_pop(&buffer_queue);
+                if (new_val[iter] == '\n')
+                {
+                    number_complete = 1;
+                    full_num_count--;
+                }
+                iter++;
+                if (iter == 6)
+                {
+                    printf("Number runaway\n");
+                    while (queue_front(&buffer_queue, &new_val[iter]) == '\n')
+                    {
+                        queue_pop(&buffer_queue);
+                    }
+                    free(new_val);
+                    new_val = nullptr;
+                    goto NUM_RUNAW_HANDL;
+                }
+            }
+            while (!number_complete);
+
+
             //Prikaz
             int pos = 0;
             char is_buf_corrupted = 0;
-            while (buffer[pos] != '\n')
+            while (new_val[pos] != '\n')
             {
                 pos++;
-                if (pos == bytes_available)
+                if (pos == 5)
                 {
                     printf("Error while searching number's end byte, skipping iteration\n");
                     is_buf_corrupted = 1;
@@ -219,13 +282,13 @@ int main()
 
                 for (int i = 0; i < pos; i++)
                 {
-                    buf_b_p[i] = buffer[i];
+                    buf_b_p[i] = new_val[i];
                 }
 
                 buf_b_p[pos] = '\0';
 
                 char is_num_corrupted = str_num_checker(buf_b_p);
-                if(is_num_corrupted == -1)
+                if (is_num_corrupted == -1)
                 {
                     printf("Pos of end byte changed, recalculating\n");
                     pos = 0;
@@ -240,7 +303,7 @@ int main()
                         }
                     }
                     is_num_corrupted = 0;
-                    if(pos == 0)
+                    if (pos == 0)
                     {
                         is_num_corrupted = 1;
                     }
@@ -248,9 +311,19 @@ int main()
 
                 if (!is_num_corrupted)
                 {
+                    unsigned int adc_val = (int)strtol(buf_b_p, nullptr, 10);
+
+                    unsigned int volume = (100 * adc_val) / 1024;
+
+                    if (volume > 100)
+                    {
+                        volume = 100;
+                    }
+
+
                     printf("Num OK\n");
                     unsigned int size = 0;
-                    switch (pos)
+                    switch (count_digits(volume))
                     {
                     case 1:
                         command = (char*)malloc(21 * sizeof(char)); //21
@@ -284,13 +357,6 @@ int main()
                         signal_exit_handler(-1);
                     }
 
-                    int volume = (int)strtol(buf_b_p, nullptr, 10);
-
-                    if (volume > 100)
-                    {
-                        volume = 100;
-                    }
-
                     snprintf(command, size, "amixer set Master %d%%", volume);
                     printf("\n");
                     const int result = system(command);
@@ -306,13 +372,14 @@ int main()
                 {
                     printf("Number corrupted, skipping\n");
                 }
+
             }
             else
             {
                 printf("Buffer corrupted, skipping\n");
             }
-            free(buffer);
-            buffer = nullptr;
+            free(new_val);
+            new_val = nullptr;
             printf("\n");
             printf("-----------------------------------------");
             printf("-----------------------------------------\n");
