@@ -137,6 +137,40 @@ unsigned int count_digits(const unsigned int num)
     return 1 + count_digits(num / 10);
 }
 
+void own_itoa(unsigned int num, char* str)
+{
+    unsigned const int digits = count_digits(num);
+    for (unsigned int i = 0; i < digits; i++)
+    {
+        unsigned const int temp = num % 10 + '0';
+        str[digits - i - 1] = (char)temp;
+        num /= 10;
+    }
+    str[digits] = '\0';
+}
+
+char send_volume_handler(const int volume)
+{
+    static int last_volume = -1;
+    if (volume != last_volume)
+    {
+        unsigned const int digits = count_digits(volume);
+        char buf[digits + 1];
+        own_itoa(volume, buf);
+        if (write(port, buf, digits) != digits)
+        {
+            return 0;
+        }
+        if (write(port, "\n", 1) != 1)
+        {
+            return 0;
+        }
+        last_volume = volume;
+        return 2;
+    }
+    return 1;
+}
+
 int main()
 {
     // Set up signal handlers for cleanup on exit
@@ -372,6 +406,21 @@ int main()
                         if (result != 0)
                         {
                             printf("Error while executing command\n");
+                        }
+
+                        char send_volume_val = send_volume_handler(volume);
+
+                        if (send_volume_val == 0)
+                        {
+                            printf("Error while sending volume (%d)\n", volume);
+                        }
+                        else if (send_volume_val == 1)
+                        {
+                            printf("Volume already set (%d)\n", volume);
+                        }
+                        else
+                        {
+                            printf("Volume set (%d)\n", volume);
                         }
 
                         free(command);
