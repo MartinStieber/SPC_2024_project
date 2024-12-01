@@ -58,6 +58,13 @@ int UART_Init(const int port)
 void signal_exit_handler(const int signum)
 {
     printf("Caught signal %d\n", signum);
+
+    //Send reset byte to the device
+    printf("Sending reset byte now...\n");
+    constexpr char reset = 'r';
+    write(port, &reset, 1);
+    write(port, "\n", 1);
+
     if (port >= 0)
     {
         printf("Detected opened port, closing now...");
@@ -79,7 +86,10 @@ void signal_exit_handler(const int signum)
         command = nullptr;
         printf("RELEASED\n");
     }
+
+    // Destroy the buffer queue
     queue_destroy(&buffer_queue);
+
     printf("Sanity checked\n");
     printf("Exiting...\n");
     exit(signum);
@@ -232,8 +242,8 @@ int main()
         int bytes_available = 0;
         if (ioctl(port, FIONREAD, &bytes_available) == -1)
         {
-            printf("Error while checking bytes available\n");
-            break;
+            printf("Error while checking bytes available, is HW still connected? Exiting now, calling signal_exit_handler with signum 99\n");
+            signal_exit_handler(99);
         }
 
         if (bytes_available > 0)
