@@ -35,8 +35,8 @@ int UART_Init(const int port)
         printf("Unable to get terminal attributes\n");
         return 1;
     }
-    cfsetispeed(&Serial, B57600);
-    cfsetospeed(&Serial, B57600);
+    cfsetispeed(&Serial, B115200);
+    cfsetospeed(&Serial, B115200);
 
     Serial.c_cflag &= ~CSIZE;
     Serial.c_cflag |= CS8;
@@ -281,6 +281,9 @@ char send_volume_handler(const int volume)
 
 int main()
 {
+    printf("BPC_SPC_Project\n");
+    printf("Created by: Jan Lána, Martin Stieber; 2024\n\n\n\n");
+
     pthread_setname_np(pthread_self(), "BPC_SPC_Project");
     printf("Program started with thread id: %ld\n", pthread_self());
     // Set up signal handlers for cleanup on exit
@@ -299,7 +302,7 @@ int main()
     if (port < 0)
     {
         printf("Unable to open port, is HW connected? Check it, and try again.\n");
-        return 1;
+        signal_exit_handler(99);
     }
     printf("Port open successfully\n");
 
@@ -307,8 +310,7 @@ int main()
     if (UART_Init(port) != 0)
     {
         printf("Unable to initialize UART\n");
-        close(port);
-        return 1;
+        signal_exit_handler(99);
     }
 
     // Handshake with the device
@@ -334,7 +336,7 @@ int main()
         }
     }
     while (rec_byte != welcome);
-    printf("Connection established, welcome byte OK\n");
+    printf("Connection established, welcome byte OK\n\n");
 
     // Initialize the buffer queue
     queue_init(&buffer_queue);
